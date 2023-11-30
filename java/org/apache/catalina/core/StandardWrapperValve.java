@@ -34,14 +34,15 @@ import org.apache.catalina.Globals;
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.comet.CometEvent;
 import org.apache.catalina.comet.CometProcessor;
-import org.apache.catalina.connector.ClientAbortException;
 import org.apache.catalina.connector.Request;
 import org.apache.catalina.connector.Response;
 import org.apache.catalina.valves.ValveBase;
+import org.apache.coyote.BadRequestException;
 import org.apache.tomcat.util.ExceptionUtils;
 import org.apache.tomcat.util.buf.MessageBytes;
 import org.apache.tomcat.util.log.SystemLogHandler;
 import org.apache.tomcat.util.res.StringManager;
+import org.apache.coyote.CloseNowException;
 
 /**
  * Valve that implements the default basic behavior for the
@@ -222,7 +223,18 @@ final class StandardWrapperValve
                 }
 
             }
-        } catch (ClientAbortException e) {
+        } catch (BadRequestException e) {
+            if (container.getLogger().isDebugEnabled()) {
+                container.getLogger().debug(
+                        sm.getString("standardWrapper.serviceException", wrapper.getName(), context.getName()), e);
+            }
+            throwable = e;
+            exception(request, response, e, HttpServletResponse.SC_BAD_REQUEST);
+        } catch (CloseNowException e) {
+            if (container.getLogger().isDebugEnabled()) {
+                container.getLogger().debug(
+                        sm.getString("standardWrapper.serviceException", wrapper.getName(), context.getName()), e);
+            }
             throwable = e;
             exception(request, response, e);
         } catch (IOException e) {
@@ -253,7 +265,7 @@ final class StandardWrapperValve
             // do not want to do exception(request, response, e) processing
         } catch (ServletException e) {
             Throwable rootCause = StandardWrapper.getRootCause(e);
-            if (!(rootCause instanceof ClientAbortException)) {
+            if (!(rootCause instanceof BadRequestException)) {
                 container.getLogger().error(sm.getString(
                         "standardWrapper.serviceExceptionRoot",
                         wrapper.getName(), context.getName(), e.getMessage()),
@@ -409,7 +421,7 @@ final class StandardWrapperValve
                 }
 
             }
-        } catch (ClientAbortException e) {
+        } catch (BadRequestException e) {
             throwable = e;
             exception(request, response, e);
         } catch (IOException e) {
@@ -426,7 +438,7 @@ final class StandardWrapperValve
             // do not want to do exception(request, response, e) processing
         } catch (ServletException e) {
             Throwable rootCause = StandardWrapper.getRootCause(e);
-            if (!(rootCause instanceof ClientAbortException)) {
+            if (!(rootCause instanceof BadRequestException)) {
                 container.getLogger().error(sm.getString(
                         "standardWrapper.serviceExceptionRoot",
                         wrapper.getName(), context.getName(), e.getMessage()),
@@ -500,10 +512,21 @@ final class StandardWrapperValve
      * @param exception The exception that occurred (which possibly wraps
      *  a root cause exception
      */
-    private void exception(Request request, Response response,
-                           Throwable exception) {
+//    private void exception(Request request, Response response,
+//                           Throwable exception) {
+//        request.setAttribute(RequestDispatcher.ERROR_EXCEPTION, exception);
+//        response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+//        response.setError();
+//    }
+
+    private void exception(Request request, Response response, Throwable exception) {
+        exception(request, response, exception, HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+    }
+
+    private void exception(Request request, Response response, Throwable exception, int errorCode) {
         request.setAttribute(RequestDispatcher.ERROR_EXCEPTION, exception);
-        response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+//        response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+        response.setStatus(errorCode);
         response.setError();
     }
 

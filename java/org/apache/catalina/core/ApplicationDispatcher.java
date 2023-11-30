@@ -38,14 +38,14 @@ import javax.servlet.http.HttpServletResponse;
 import org.apache.catalina.AsyncDispatcher;
 import org.apache.catalina.Context;
 import org.apache.catalina.Globals;
+import org.apache.catalina.util.InstanceSupport;
 import org.apache.catalina.InstanceEvent;
 import org.apache.catalina.Wrapper;
-import org.apache.catalina.connector.ClientAbortException;
 import org.apache.catalina.connector.Request;
 import org.apache.catalina.connector.RequestFacade;
 import org.apache.catalina.connector.Response;
 import org.apache.catalina.connector.ResponseFacade;
-import org.apache.catalina.util.InstanceSupport;
+import org.apache.coyote.BadRequestException;
 import org.apache.tomcat.util.ExceptionUtils;
 import org.apache.tomcat.util.res.StringManager;
 
@@ -744,7 +744,7 @@ final class ApplicationDispatcher implements AsyncDispatcher, RequestDispatcher 
             // Servlet Service Method is called by the FilterChain
             support.fireInstanceEvent(InstanceEvent.AFTER_DISPATCH_EVENT,
                                       servlet, request, response);
-        } catch (ClientAbortException e) {
+        } catch (BadRequestException e) {
             support.fireInstanceEvent(InstanceEvent.AFTER_DISPATCH_EVENT,
                                       servlet, request, response);
             ioException = e;
@@ -765,7 +765,7 @@ final class ApplicationDispatcher implements AsyncDispatcher, RequestDispatcher 
             support.fireInstanceEvent(InstanceEvent.AFTER_DISPATCH_EVENT,
                                       servlet, request, response);
             Throwable rootCause = StandardWrapper.getRootCause(e);
-            if (!(rootCause instanceof ClientAbortException)) {
+            if (!(rootCause instanceof BadRequestException)) {
                 wrapper.getLogger().error(sm.getString("applicationDispatcher.serviceException",
                         wrapper.getName()), rootCause);
             }

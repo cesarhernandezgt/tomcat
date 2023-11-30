@@ -16,7 +16,7 @@
  */
 package org.apache.catalina.connector;
 
-import java.io.IOException;
+import org.apache.coyote.BadRequestException;
 
 /**
  * Extend IOException to identify it as being caused by an abort of a request by
@@ -24,7 +24,7 @@ import java.io.IOException;
  *
  * @author Glenn L. Nielsen
  */
-public final class ClientAbortException extends IOException {
+public final class ClientAbortException extends BadRequestException {
 
     private static final long serialVersionUID = 1L;
 

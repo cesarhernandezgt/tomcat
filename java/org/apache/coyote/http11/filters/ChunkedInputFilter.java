@@ -22,6 +22,7 @@ import java.nio.charset.Charset;
 import java.util.Locale;
 import java.util.Set;
 
+import org.apache.coyote.BadRequestException;
 import org.apache.coyote.InputBuffer;
 import org.apache.coyote.Request;
 import org.apache.coyote.http11.Constants;
@@ -190,7 +191,7 @@ public class ChunkedInputFilter implements InputFilter {
 
         if (remaining <= 0) {
             if (!parseChunkHeader()) {
-                throwIOException(sm.getString("chunkedInputFilter.invalidHeader"));
+                throwBadRequestException(sm.getString("chunkedInputFilter.invalidHeader"));
             }
             if (endChunk) {
                 parseEndChunk();
@@ -202,7 +203,7 @@ public class ChunkedInputFilter implements InputFilter {
 
         if (pos >= lastValid) {
             if (readBytes() < 0) {
-                throwIOException(sm.getString("chunkedInputFilter.eos"));
+                throwEOFException(sm.getString("chunkedInputFilter.eos"));
             }
         }
 
@@ -252,7 +253,7 @@ public class ChunkedInputFilter implements InputFilter {
         while ((read = doRead(readChunk, null)) >= 0) {
             swallowed += read;
             if (maxSwallowSize > -1 && swallowed > maxSwallowSize) {
-                throwIOException(sm.getString("inputFilter.maxSwallow"));
+                throwBadRequestException(sm.getString("inputFilter.maxSwallow"));
             }
         }
 
@@ -379,7 +380,7 @@ public class ChunkedInputFilter implements InputFilter {
                 // validated. Currently it is simply ignored.
                 extensionSize++;
                 if (maxExtensionSize > -1 && extensionSize > maxExtensionSize) {
-                    throwIOException(sm.getString("chunkedInputFilter.maxExtension"));
+                    throwBadRequestException(sm.getString("chunkedInputFilter.maxExtension"));
                 }
             }
 
@@ -427,22 +428,22 @@ public class ChunkedInputFilter implements InputFilter {
         while (!eol) {
             if (pos >= lastValid) {
                 if (readBytes() <= 0) {
-                    throwIOException(sm.getString("chunkedInputFilter.invalidCrlfNoData"));
+                    throwBadRequestException(sm.getString("chunkedInputFilter.invalidCrlfNoData"));
                 }
             }
 
             if (buf[pos] == Constants.CR) {
                 if (crfound) {
-                    throwIOException(sm.getString("chunkedInputFilter.invalidCrlfCRCR"));
+                    throwBadRequestException(sm.getString("chunkedInputFilter.invalidCrlfCRCR"));
                 }
                 crfound = true;
             } else if (buf[pos] == Constants.LF) {
                 if (!tolerant && !crfound) {
-                    throwIOException(sm.getString("chunkedInputFilter.invalidCrlfNoCR"));
+                    throwBadRequestException(sm.getString("chunkedInputFilter.invalidCrlfNoCR"));
                 }
                 eol = true;
             } else {
-                throwIOException(sm.getString("chunkedInputFilter.invalidCrlf"));
+                throwBadRequestException(sm.getString("chunkedInputFilter.invalidCrlf"));
             }
 
             pos++;
@@ -509,7 +510,10 @@ public class ChunkedInputFilter implements InputFilter {
                 colon = true;
             } else if (!HttpParser.isToken(chr)) {
                 // Non-token characters are illegal in header names
-                throw new IOException(sm.getString("chunkedInputFilter.invalidTrailerHeaderName"));
+//                throw new IOException(sm.getString("chunkedInputFilter.invalidTrailerHeaderName"));
+                throwBadRequestException(sm.getString("chunkedInputFilter.invalidTrailerHeaderName"));
+            } else if (trailingHeaders.getEnd() >= trailingHeaders.getLimit()) {
+                throwBadRequestException(sm.getString("chunkedInputFilter.maxTrailer"));
             } else {
                 trailingHeaders.append(chr);
             }
@@ -548,7 +552,7 @@ public class ChunkedInputFilter implements InputFilter {
                     // limit placed on trailing header size
                     int newlimit = trailingHeaders.getLimit() -1;
                     if (trailingHeaders.getEnd() > newlimit) {
-                        throwIOException(sm.getString("chunkedInputFilter.maxTrailer"));
+                        throwBadRequestException(sm.getString("chunkedInputFilter.maxTrailer"));
                     }
                     trailingHeaders.setLimit(newlimit);
                 } else {
@@ -573,6 +577,8 @@ public class ChunkedInputFilter implements InputFilter {
                     eol = true;
                 } else if (HttpParser.isControl(chr) && chr != Constants.HT) {
                     throw new IOException(sm.getString("chunkedInputFilter.invalidTrailerHeaderValue"));
+                } else if (trailingHeaders.getEnd() >= trailingHeaders.getLimit()) {
+                    throwBadRequestException(sm.getString("chunkedInputFilter.maxTrailer"));
                 } else if (chr == Constants.SP || chr == Constants.HT) {
                     trailingHeaders.append(chr);
                 } else {
@@ -598,6 +604,8 @@ public class ChunkedInputFilter implements InputFilter {
             chr = buf[pos];
             if ((chr != Constants.SP) && (chr != Constants.HT)) {
                 validLine = false;
+            } else if (trailingHeaders.getEnd() >= trailingHeaders.getLimit()) {
+                throwBadRequestException(sm.getString("chunkedInputFilter.maxTrailer"));
             } else {
                 eol = false;
                 // Copying one extra space in the buffer (since there must
@@ -622,9 +630,9 @@ public class ChunkedInputFilter implements InputFilter {
     }
 
 
-    private void throwIOException(String msg) throws IOException {
+    private void throwBadRequestException(String msg) throws IOException {
         error = true;
-        throw new IOException(msg);
+        throw new BadRequestException(msg);
     }
 
 
