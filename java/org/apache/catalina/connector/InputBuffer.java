@@ -310,11 +310,9 @@ public class InputBuffer extends Reader
         // Set flag used by asynchronous processing to detect errors on non-container threads
         coyoteRequest.setErrorException(e);
         // In synchronous processing, this exception may be swallowed by the application so set error flags here.
-        Request request = (Request) coyoteRequest.getNote(CoyoteAdapter.ADAPTER_NOTES);
-        org.apache.coyote.Response response = request.getResponse();
-        request.setAttribute(RequestDispatcher.ERROR_EXCEPTION, e);
-        response.setStatus(400);
-        response.setError();
+        coyoteRequest.setAttribute(RequestDispatcher.ERROR_EXCEPTION, e);
+        coyoteRequest.getResponse().setStatus(400);
+        coyoteRequest.getResponse().setError();
     }
 
 
