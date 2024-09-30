@@ -46,6 +46,7 @@ public class SecureNioChannel extends NioChannel  {
     protected SSLEngine sslEngine;
 
     protected boolean handshakeComplete = false;
+    protected boolean needHandshakeWrap = false;
     protected HandshakeStatus handshakeStatus; //gets set by handshake
 
     protected boolean closed = false;
@@ -480,6 +481,14 @@ public class SecureNioChannel extends NioChannel  {
                 //perform any tasks if needed
                 if (unwrap.getHandshakeStatus() == HandshakeStatus.NEED_TASK) {
                     tasks();
+                } else if (unwrap.getHandshakeStatus() == HandshakeStatus.NEED_WRAP) {
+                    if (getOutboundRemaining() == 0) {
+                        handshakeWrap(true);
+                    } else if (needHandshakeWrap) {
+                        throw new IOException(sm.getString("channel.nio.ssl.handshakeWrapPending"));
+                    } else {
+                        needHandshakeWrap = true;
+                    }
                 }
                 //if we need more network data, then bail out for now.
                 if (unwrap.getStatus() == Status.BUFFER_UNDERFLOW) {
